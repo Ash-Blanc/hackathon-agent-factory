@@ -4,10 +4,13 @@ Run the Hackathon Factory autonomously on Modal's serverless GPU/CPU cloud.
 Scheduled cron execution: Runs every 24 hours to scout, synthesize, and build.
 """
 
-import modal
+from pathlib import Path
 import os
+import modal
 
 app = modal.App("hackathon-agent-factory")
+
+ROOT_DIR = Path(__file__).parent.parent
 
 # Define cloud container image
 factory_image = (
@@ -31,6 +34,7 @@ factory_image = (
         "NIA_API_KEY": "nk_JPOVIPNqKJvYMwNq1coc42dv2aNM1d3P",
         "PARALLEL_TASK_KEY": "GZH5U44pQHrEVjBaQcTN7CKabWsfE4tk1rQPponw"
     })
+    .add_local_dir(str(ROOT_DIR), remote_path="/app")
 )
 
 # Persistent volume for project repositories and build deliverables
@@ -47,7 +51,6 @@ def run_daily_hackathon_factory():
     import sys
     sys.path.append("/app")
     from factory.agno_orchestrator import build_hackathon_factory_agent
-    from pathlib import Path
 
     print("⚡ Launching Cloud Hackathon Factory on Modal...")
     agent = build_hackathon_factory_agent(Path("/root/builds"))
