@@ -1,0 +1,8 @@
+# Kdenlive Assembly Protocol
+1. Load reusable template (1080p, 60fps).
+2. Align:
+   Track A1: clips/01_hook.wav -> 02_problem.wav -> 03_demo.wav -> 04_under_the_hood.wav -> 05_cta.wav
+   Track V1: clips/01_hook.mp4 -> 02_problem.mp4 -> 03_demo.mp4 -> 04_under_the_hood.mp4 -> 05_cta.mp4
+3. Speed-ramp loading waits in Track V1 to 300%+ to preserve snappy flow.
+4. Run Whisper / Vosk subtitle generator -> Burn in captions.
+5. Export timeline master or pass to FFmpeg.
