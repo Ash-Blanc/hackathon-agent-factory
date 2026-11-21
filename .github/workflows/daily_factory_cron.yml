@@ -1,0 +1,52 @@
+name: Autonomous Hackathon Factory Daily Cron
+
+on:
+  schedule:
+    # Runs every day at 06:00 UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  run-factory:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install OpenCode CLI
+        run: |
+          curl -fsSL https://opencode.ai/install.sh | bash || true
+          echo "$HOME/.opencode/bin" >> $GITHUB_PATH
+
+      - name: Run Factory Loop (Radar + Intel + Ideation + Scaffolding)
+        env:
+          TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY || 'oat_O56NK5QJZMY7BBZ6FJRH7S3ZFYZNJSTS' }}
+          NIA_API_KEY: ${{ secrets.NIA_API_KEY || 'nk_JPOVIPNqKJvYMwNq1coc42dv2aNM1d3P' }}
+          PARALLEL_TASK_KEY: ${{ secrets.PARALLEL_TASK_KEY || 'GZH5U44pQHrEVjBaQcTN7CKabWsfE4tk1rQPponw' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uv run python main.py
+
+      - name: Commit & Push New Build Blueprints
+        run: |
+          git config --global user.name "Autonomous Factory Bot"
+          git config --global user.email "bot@hackathon-factory.ai"
+          git add data/builds/
+          git diff --quiet && git diff --staged --quiet || git commit -m "chore(factory): autonomous daily scan and project scaffold"
+          git push origin master || git push origin main
