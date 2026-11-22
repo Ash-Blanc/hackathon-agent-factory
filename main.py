@@ -3,6 +3,8 @@ Hackathon Agent Factory - Central Orchestrator & CLI
 Runs the expanded radar -> intel -> ideation -> cloud sandbox build -> GitHub repo push loop.
 """
 
+import utils.transport
+import utils.session
 import asyncio
 import os
 import sys

@@ -12,10 +12,21 @@ app = modal.App("hackathon-agent-factory")
 
 ROOT_DIR = Path(__file__).parent.parent
 
-# Define cloud container image
+# Define clean container image with robust binary downloads
 factory_image = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("git", "curl", "build-essential", "unzip")
+    .apt_install("git", "curl", "tar", "gzip", "ca-certificates")
+    .run_commands(
+        # 1. Install Bun
+        "curl -fsSL https://bun.sh/install | bash",
+        # 2. Install OpenCode (official curl endpoint is /install without .sh, or via bun)
+        "curl -fsSL https://opencode.ai/install | bash || ~/.bun/bin/bun install -g opencode-ai || true",
+        # 3. Install official GitHub CLI binary cleanly without apt repo issues
+        "curl -sSL https://github.com/cli/cli/releases/download/v2.58.0/gh_2.58.0_linux_amd64.tar.gz | tar -xz -C /tmp",
+        "cp /tmp/gh_2.58.0_linux_amd64/bin/gh /usr/local/bin/gh",
+        "chmod +x /usr/local/bin/gh",
+        "rm -rf /tmp/gh_*"
+    )
     .pip_install(
         "agno>=3.0.5",
         "httpx>=0.28.1",
@@ -23,15 +34,6 @@ factory_image = (
         "rich>=13.9.4",
         "python-dotenv>=1.0.1",
         "openai>=1.40.0"
-    )
-    .run_commands(
-        "curl -fsSL https://bun.sh/install | bash",
-        "curl -fsSL https://opencode.ai/install.sh | bash || true",
-        # Install GitHub CLI
-        "curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg",
-        "chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg",
-        "echo 'deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main' | tee /etc/apt/sources.list.d/github-cli.list > /dev/null",
-        "apt update && apt install gh -y"
     )
     .env({
         "PATH": "/root/.bun/bin:/root/.opencode/bin:/usr/local/bin:/usr/bin:/bin",
@@ -45,7 +47,6 @@ factory_image = (
 # Persistent volume for project repositories and build deliverables
 builds_volume = modal.Volume.from_name("hackathon-builds-volume", create_if_missing=True)
 
-# Use Modal Secret for GitHub token to keep it secure
 @app.function(
     image=factory_image,
     volumes={"/root/builds": builds_volume},
