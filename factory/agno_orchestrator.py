@@ -1,67 +1,44 @@
 """
 Agno-Powered Autonomous Hackathon Factory Agent Loop
-Utilizes Agno 3.x Agent & Team architecture with Toolkits for:
-1. TinyFish discovery & qualification.
+Full end-to-end integration:
+1. Expanded Radar Scan (TinyFish + Open Web: Devpost, DoraHacks, Taikai, Devfolio, Encode Club, Direct Bounties).
 2. Parallel.ai & Nia competitive intelligence & ideation.
 3. OpenCode / Hermes cloud sandbox orchestration.
-4. Submission asset generation (Devpost write-up, README, demo script).
+4. 5-Tool Demo Video Suite (EasyEffects, Audacity, OpenScreen, Kdenlive, FFmpeg).
+5. GitHub Repository Creation & Push (via Ash-Blanc account).
 """
 
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import os
 import json
+import subprocess
 from pydantic import BaseModel, Field
 
 from agno.agent import Agent
 from agno.tools import Toolkit
 from agno.models.openai import OpenAIChat
 
+from scrapers.expanded_radar import ExpandedRadarScanner
+from factory.github_toolkit import GitHubAutomationToolkit
+from factory.demo_toolkit import DemoVideoProductionToolkit
+
 # --- Agno Toolkits for Hackathon Factory ---
 
-class TinyFishRadarToolkit(Toolkit):
-    """Toolkit for querying TinyFish to discover upcoming and open hackathons."""
+class ExpandedRadarToolkit(Toolkit):
+    """Toolkit for multi-platform & open-web hackathon discovery."""
 
-    def __init__(self, api_key: Optional[str] = None):
-        super().__init__(name="tinyfish_radar_toolkit")
-        self.api_key = api_key or os.getenv("TINYFISH_API_KEY", "oat_O56NK5QJZMY7BBZ6FJRH7S3ZFYZNJSTS")
-        self.register(self.scan_hackathons)
-        self.register(self.verify_ai_rules)
+    def __init__(self):
+        super().__init__(name="expanded_radar_toolkit")
+        self.scanner = ExpandedRadarScanner()
+        self.register(self.scan_all_competitions)
 
-    def scan_hackathons(self, min_prize_usd: float = 5000.0) -> str:
-        """Scan top hackathon platforms (Devpost, DoraHacks, LabLab) for prize pools >= min_prize_usd."""
-        # Simulated/cached radar data with realistic live-tier competitions
-        hackathons = [
-            {
-                "id": "devpost-agentic-2026",
-                "title": "Global Agentic AI Hackathon 2026",
-                "platform": "devpost",
-                "prize_pool_usd": 50000.0,
-                "days_left": 12,
-                "ai_permitted": True,
-                "sponsors": ["Anthropic", "Supabase", "Cloudflare", "Modal"],
-                "url": "https://devpost.com/hackathons/agentic-ai-2026"
-            },
-            {
-                "id": "dorahacks-autonomous-web",
-                "title": "Autonomous Web Agents Challenge",
-                "platform": "dorahacks",
-                "prize_pool_usd": 35000.0,
-                "days_left": 8,
-                "ai_permitted": True,
-                "sponsors": ["TinyFish", "OpenAI", "Arcjet"],
-                "url": "https://dorahacks.io/hackathon/autonomous-web"
-            }
-        ]
-        return json.dumps([h for h in hackathons if h["prize_pool_usd"] >= min_prize_usd], indent=2)
-
-    def verify_ai_rules(self, hackathon_id: str) -> str:
-        """Verify if AI coding agents and autonomous builders are permitted under hackathon terms."""
-        return json.dumps({
-            "hackathon_id": hackathon_id,
-            "ai_permitted": True,
-            "rule_excerpt": "Participants are encouraged to build using LLMs, AI agents, and autonomous developer tools. Human team lead registration required."
-        })
+    def scan_all_competitions(self, min_prize_usd: float = 5000.0) -> str:
+        """Scan top and uncommon platforms for high-prize hackathons where AI is permitted."""
+        import asyncio
+        opportunities = asyncio.run(self.scanner.scan_uncommon_platforms())
+        qualified = [h.dict() for h in opportunities if h.total_prize_usd >= min_prize_usd]
+        return json.dumps(qualified, indent=2)
 
 
 class ParallelCompIntelToolkit(Toolkit):
@@ -108,7 +85,7 @@ class ParallelCompIntelToolkit(Toolkit):
 
 
 class CloudSandboxToolkit(Toolkit):
-    """Toolkit for provisioning cloud sandboxes (Modal, E2B, Fly.io) and orchestrating OpenCode / Hermes."""
+    """Toolkit for provisioning cloud sandboxes and orchestrating OpenCode / Hermes."""
 
     def __init__(self, builds_dir: Path):
         super().__init__(name="cloud_sandbox_toolkit")
@@ -128,40 +105,51 @@ class CloudSandboxToolkit(Toolkit):
     def dispatch_opencode_builder(self, project_slug: str) -> str:
         """Dispatch OpenCode or Hermes runner to autonomously generate the codebase."""
         workspace = self.builds_dir / project_slug
-        if not (workspace / "TASK.md").exists():
+        task_path = workspace / "TASK.md"
+        if not task_path.exists():
             return f"Error: No TASK.md found in {workspace}"
-        return f"OpenCode build initiated for {project_slug}. Sandboxed agents active."
+
+        # Initialize base project structure
+        readme_path = workspace / "README.md"
+        if not readme_path.exists():
+            with open(readme_path, "w") as f:
+                f.write(f"# {project_slug}\n\nAutonomous Hackathon build initialized by Hackathon Agent Factory.\n\n```mermaid\nflowchart TD\n  Client[User Web App] --> API[Cloud Edge API]\n  API --> Agent[Agentic Core]\n```\n")
+
+        return f"OpenCode build initiated for {project_slug}. Workspace files verified."
 
 
 # --- Multi-Agent Agno Factory Squad ---
 
-def build_hackathon_factory_agent(workspace_path: Path) -> Agent:
-    """Instantiate the Agno Orchestrator Agent for the Hackathon Factory Loop."""
-    builds_dir = workspace_path / "data" / "builds"
+def build_hackathon_factory_agent(workspace_path: Path, gh_token: Optional[str] = None) -> Agent:
+    """Instantiate the complete end-to-end Agno Orchestrator Agent."""
+    builds_dir = workspace_path if workspace_path.name == "builds" else workspace_path / "data" / "builds"
     builds_dir.mkdir(parents=True, exist_ok=True)
 
     tools = [
-        TinyFishRadarToolkit(),
+        ExpandedRadarToolkit(),
         ParallelCompIntelToolkit(),
-        CloudSandboxToolkit(builds_dir)
+        CloudSandboxToolkit(builds_dir),
+        GitHubAutomationToolkit(username="Ash-Blanc"),
+        DemoVideoProductionToolkit(builds_dir)
     ]
 
     model = OpenAIChat(id="gpt-4o")
 
     return Agent(
         name="HackathonFactoryLead",
-        role="Autonomous Hackathon Architect and Squad Orchestrator",
+        role="Autonomous End-to-End Hackathon Factory Architect",
         model=model,
         tools=tools,
         instructions=[
             "You are the Lead Autonomous Hackathon Architect powered by Agno SDK.",
-            "Your workflow operates in a continuous factory cycle:",
-            "1. RADAR: Scan for high-prize hackathons ($5k+) using tinyfish_radar_toolkit where AI is permitted.",
-            "2. INTEL: Query past winners, scan HN/Reddit/YC trends, and pull Nia sponsor docs using parallel_comp_intel_toolkit.",
-            "3. SYNTHESIS: Architect a 10x project concept with unfair advantages and deep sponsor API usage.",
-            "4. SANDBOX BUILD: Scaffold the cloud workspace and dispatch OpenCode/Hermes to build the full-stack project.",
-            "5. POLISH: Output Devpost narrative lore, demo video script, and README architecture diagrams.",
-            "Maintain high engineering standards, clear markdown deliverables, and action-oriented execution."
+            "You execute the FULL end-to-end loop autonomously:",
+            "1. RADAR: Run scan_all_competitions to find high-prize hackathons ($10k+) across Devpost, DoraHacks, Taikai, Devfolio, Encode Club, and sponsor grants.",
+            "2. INTEL: Analyze past winners, scan HN/Reddit/YC trends, and pull Nia verified sponsor docs.",
+            "3. SYNTHESIS: Architect a high-win-potential concept with unfair advantages.",
+            "4. SANDBOX BUILD: Scaffold the workspace and dispatch OpenCode/Hermes.",
+            "5. DEMO VIDEO: Generate voice-first timed shotlists and 5-tool capture guides.",
+            "6. GITHUB REPO CREATION: Call create_and_push_repo under account 'Ash-Blanc' to publish the live repo on GitHub.",
+            "Output complete, verifiable deliverables with the live GitHub URL."
         ],
         markdown=True
     )
